@@ -1,0 +1,21 @@
+package x509keyserver;
+
+// Individual key list entry for listing keys; you will still have to
+// retrieve the actual key bits but this should give you some metadata
+// to display.
+message X509KeyData {
+	// The certificate index number.
+	required uint64 index = 1;
+
+	// The subject field of the certificate.
+	required string subject = 2;
+
+	// The subject field of the certificate which issued this one.
+	required string issuer = 3;
+
+	// Time stamp of when the certificate is going to expire.
+	required uint64 expires = 4;
+
+	// Optional actual certificate content.
+	optional bytes der_certificate = 5;
+}
