@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+	<title>Registered X.509 certificates</title>
+	<meta http-equiv="robots" content="index,nofollow"/>
+  </head>
+  <body>
+  	<h1>Known X.509 certificates</h1>
+  	<table>
+ 	  <thead>
+ 	    <tr>
+ 	      <th>#</th>
+ 	      <th>Subject</th>
+ 	      <th>Issuer</th>
+ 	      <th>Expires</th>
+ 	    </tr>
+ 	  </thead>
+ 	  <tbody>
+{{range .Certs}}
+		<tr>
+		  <td>{{.Pb.GetIndex}}</td>
+		  <td>{{.Pb.GetSubject}}</td>
+		  <td>{{.Pb.GetIssuer}}</td>
+		  <td>{{.Expires}}</td>
+		</tr>
+{{else}}
+		<tr>
+		  <td colspan="4">None</td>
+		</tr>
+{{end}}
+ 	  </tbody>
+  	</table>
+  </body>
+</html>
