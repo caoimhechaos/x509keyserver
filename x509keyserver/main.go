@@ -29,40 +29,66 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package x509keyserver
+package main
 
 import (
-	"crypto/x509"
+	"flag"
+	"html/template"
+	"log"
+	"net/http"
+	"net/rpc"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/caoimhechaos/x509keyserver"
 )
 
-// Implementation of the X.509 key server RPC interface.
-type X509KeyServer struct {
-	Db *X509KeyDB
-}
-
-// List the next number of known certificates starting from the start index.
-func (s *X509KeyServer) ListCertificates(req X509KeyDataListRequest, res *X509KeyDataList) error {
+func main() {
+	var tmpl *template.Template
+	var ks *x509keyserver.X509KeyServer
+	var kdb *x509keyserver.X509KeyDB
+	var bind string
+	var tmpl_path string
+	var dbserver, keyspace string
 	var err error
-	res.Records, err = s.Db.ListCertificates(req.GetStartIndex(), req.GetCount())
-	return err
-}
 
-// Retrieve the certificate with the given index number from the database.
-func (s *X509KeyServer) RetrieveCertificateByIndex(req X509KeyDataRequest, ret *X509KeyData) error {
-	var cert *x509.Certificate
-	var err error
-	cert, err = s.Db.RetrieveCertificateByIndex(req.GetIndex())
+	flag.StringVar(&bind, "bind", "[::]:8080",
+		"host:port pair to bind the HTTP/RPC server to")
+	flag.StringVar(&tmpl_path, "template", "keylist.html",
+		"Path to the template file for displaying")
+
+	flag.StringVar(&dbserver, "cassandra-server", "localhost:9160",
+		"host:port pair of the Cassandra database server")
+	flag.StringVar(&keyspace, "cassandra-keyspace", "x509certs",
+		"Cassandra keyspace in which the relevant column families are stored")
+	flag.Parse()
+
+	// Set up the connection to the key database.
+	kdb, err = x509keyserver.NewX509KeyDB(dbserver, keyspace)
 	if err != nil {
-		return err
+		log.Fatal("Error connecting to key database: ", err)
+	}
+	ks = &x509keyserver.X509KeyServer{
+		Db: kdb,
 	}
 
-	ret.DerCertificate = cert.Raw
-	ret.Expires = proto.Uint64(uint64(cert.NotAfter.Unix()))
-	ret.Index = proto.Uint64(req.GetIndex())
-	ret.Issuer = proto.String(cert.Issuer.CommonName)   // TODO(caoimhe): Fill in more
-	ret.Subject = proto.String(cert.Subject.CommonName) // TODO(caoimhe): Fill in more
+	// Register the RPC service.
+	err = rpc.Register(ks)
+	if err != nil {
+		log.Fatal("Error registering RPC handler for the key server: ", err)
+	}
 
-	return nil
+	tmpl, err = template.ParseFiles(tmpl_path)
+	if err != nil {
+		log.Fatal("Error parsing template ", tmpl_path, ": ", err)
+	}
+
+	// Tell the HTTP server to handle RPCs.
+	rpc.HandleHTTP()
+
+	err = http.ListenAndServe(bind, &x509keyserver.HTTPKeyService{
+		Db:   kdb,
+		Tmpl: tmpl,
+	})
+	if err != nil {
+		log.Fatal("Error binding to ", bind, ": ", err)
+	}
 }

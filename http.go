@@ -32,37 +32,61 @@
 package x509keyserver
 
 import (
-	"crypto/x509"
-
-	"code.google.com/p/goprotobuf/proto"
+	"html/template"
+	"net/http"
+	"strconv"
+	"time"
 )
 
-// Implementation of the X.509 key server RPC interface.
-type X509KeyServer struct {
-	Db *X509KeyDB
+// HTTP service to display known keys in a web site.
+type HTTPKeyService struct {
+	Db   *X509KeyDB
+	Tmpl *template.Template
 }
 
-// List the next number of known certificates starting from the start index.
-func (s *X509KeyServer) ListCertificates(req X509KeyDataListRequest, res *X509KeyDataList) error {
-	var err error
-	res.Records, err = s.Db.ListCertificates(req.GetStartIndex(), req.GetCount())
-	return err
+type httpExpandedKey struct {
+	Pb      *X509KeyData
+	Expires time.Time
 }
 
-// Retrieve the certificate with the given index number from the database.
-func (s *X509KeyServer) RetrieveCertificateByIndex(req X509KeyDataRequest, ret *X509KeyData) error {
-	var cert *x509.Certificate
+type templateData struct {
+	Certs []*httpExpandedKey
+	Error string
+}
+
+// Display a list of all known X.509 certificates.
+func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	var keydata []*X509KeyData
+	var key *X509KeyData
+	var expanded []*httpExpandedKey
+	var startidx uint64
+	var startidx_str = req.PostFormValue("start")
 	var err error
-	cert, err = s.Db.RetrieveCertificateByIndex(req.GetIndex())
-	if err != nil {
-		return err
+
+	if startidx_str != "" {
+		startidx, err = strconv.ParseUint(startidx_str, 10, 64)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(err.Error()))
+			return
+		}
 	}
 
-	ret.DerCertificate = cert.Raw
-	ret.Expires = proto.Uint64(uint64(cert.NotAfter.Unix()))
-	ret.Index = proto.Uint64(req.GetIndex())
-	ret.Issuer = proto.String(cert.Issuer.CommonName)   // TODO(caoimhe): Fill in more
-	ret.Subject = proto.String(cert.Subject.CommonName) // TODO(caoimhe): Fill in more
+	keydata, err = ks.Db.ListCertificates(startidx, 20)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte(err.Error()))
+		return
+	}
 
-	return nil
+	for _, key = range keydata {
+		var expkey *httpExpandedKey = new(httpExpandedKey)
+		expkey.Pb = key
+		expkey.Expires = time.Unix(int64(key.GetExpires()), 0)
+		expanded = append(expanded, expkey)
+	}
+
+	ks.Tmpl.Execute(rw, &templateData{
+		Certs: expanded,
+	})
 }
