@@ -29,39 +29,58 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package x509keyserver
+package main
 
 import (
-	"code.google.com/p/goprotobuf/proto"
 	"crypto/x509"
+	"encoding/pem"
+	"flag"
+	"github.com/tonnerre/x509keyserver"
+	"io/ioutil"
+	"log"
 )
 
-// Implementation of the X.509 key server RPC interface.
-type X509KeyServer struct {
-	Db *X509KeyDB
-}
-
-// List the next number of known certificates starting from the start index.
-func (s *X509KeyServer) ListCertificates(req X509KeyDataListRequest, res *X509KeyDataList) error {
-	var err error
-	res.Records, err = s.Db.ListCertificates(req.GetStartIndex(), req.GetCount())
-	return err
-}
-
-// Retrieve the certificate with the given index number from the database.
-func (s *X509KeyServer) RetrieveCertificateByIndex(req X509KeyDataRequest, ret *X509KeyData) error {
+func main() {
+	var pemblock *pem.Block
+	var pemdata []byte
 	var cert *x509.Certificate
+	var kdb *x509keyserver.X509KeyDB
+	var dbserver, keyspace string
+	var certpath string
 	var err error
-	cert, err = s.Db.RetrieveCertificateByIndex(req.GetIndex())
+
+	flag.StringVar(&certpath, "certificate-path", "cert.crt",
+		"Name of the certificate file to read")
+
+	flag.StringVar(&dbserver, "cassandra-server", "localhost:9160",
+		"host:port pair of the Cassandra database server")
+	flag.StringVar(&keyspace, "cassandra-keyspace", "x509certs",
+		"Cassandra keyspace in which the relevant column families are stored")
+	flag.Parse()
+
+	// Set up the connection to the key database.
+	kdb, err = x509keyserver.NewX509KeyDB(dbserver, keyspace)
 	if err != nil {
-		return err
+		log.Fatal("Error connecting to key database: ", err)
 	}
 
-	ret.DerCertificate = cert.Raw
-	ret.Expires = proto.Uint64(uint64(cert.NotAfter.Unix()))
-	ret.Index = proto.Uint64(req.GetIndex())
-	ret.Issuer = proto.String(string(formatCertSubject(cert.Issuer)))
-	ret.Subject = proto.String(string(formatCertSubject(cert.Subject)))
+	pemdata, err = ioutil.ReadFile(certpath)
+	if err != nil {
+		log.Fatal("Unable to open ", certpath, ": ", err)
+	}
 
-	return nil
+	pemblock, _ = pem.Decode(pemdata)
+	if pemblock != nil {
+		pemdata = pemblock.Bytes
+	}
+
+	cert, err = x509.ParseCertificate(pemdata)
+	if err != nil {
+		log.Fatal("Error parsing certificate: ", err)
+	}
+
+	err = kdb.AddX509Certificate(cert)
+	if err != nil {
+		log.Fatal("Error storing decoded certificate in database: ", err)
+	}
 }

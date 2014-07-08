@@ -25,3 +25,4 @@ _testmain.go
 *.test
 
 x509keyserver/x509keyserver
+add_cert/add_cert
