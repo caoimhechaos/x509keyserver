@@ -33,9 +33,12 @@ package x509keyserver
 
 import (
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/cassandra"
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"time"
 
 	"code.google.com/p/goprotobuf/proto"
 )
@@ -51,6 +54,30 @@ var certificate_DisplayColumns [][]byte = [][]byte{
 }
 var certificate_AllColumns [][]byte = [][]byte{
 	[]byte("subject"), []byte("issuer"), []byte("expires"), []byte("der_certificate"),
+}
+
+func formatCertSubject(name pkix.Name) []byte {
+	var ret, val string
+
+	for _, val = range name.Country {
+		ret += fmt.Sprintf("/C=%s", val)
+	}
+	for _, val = range name.Province {
+		ret += fmt.Sprintf("/SP=%s", val)
+	}
+	for _, val = range name.Locality {
+		ret += fmt.Sprintf("/L=%s", val)
+	}
+	for _, val = range name.StreetAddress {
+		ret += fmt.Sprintf("/A=%s", val)
+	}
+	for _, val = range name.Organization {
+		ret += fmt.Sprintf("/O=%s", val)
+	}
+	for _, val = range name.OrganizationalUnit {
+		ret += fmt.Sprintf("/OU=%s", val)
+	}
+	return []byte(fmt.Sprintf("%s/CN=%s", ret, name.CommonName))
 }
 
 // Connect to the X.509 key database given as "dbserver" and "keyspace".
@@ -123,7 +150,7 @@ func (db *X509KeyDB) ListCertificates(start_index uint64, count int32) ([]*X509K
 
 		for _, cos = range ks.Columns {
 			var col *cassandra.Column = cos.Column
-			if col != nil {
+			if col == nil {
 				continue
 			}
 
@@ -184,4 +211,64 @@ func (db *X509KeyDB) RetrieveCertificateByIndex(index uint64) (*x509.Certificate
 	}
 
 	return x509.ParseCertificate(r.Column.Value)
+}
+
+// Add all relevant data for the given X.509 certificate.
+func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
+	var now time.Time = time.Now()
+	var mmap = make(map[string]map[string][]*cassandra.Mutation)
+	var mutation *cassandra.Mutation
+	var expires uint64
+	var key []byte = make([]byte, 8)
+	var ire *cassandra.InvalidRequestException
+	var ue *cassandra.UnavailableException
+	var te *cassandra.TimedOutException
+	var err error
+
+	binary.BigEndian.PutUint64(key, cert.SerialNumber.Uint64())
+	mmap[string(key)] = make(map[string][]*cassandra.Mutation)
+	mmap[string(key)]["certificate"] = make([]*cassandra.Mutation, 0)
+
+	mutation = cassandra.NewMutation()
+	mutation.ColumnOrSupercolumn = cassandra.NewColumnOrSuperColumn()
+	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
+	mutation.ColumnOrSupercolumn.Column.Name = []byte("subject")
+	mutation.ColumnOrSupercolumn.Column.Value = formatCertSubject(cert.Subject)
+	mutation.ColumnOrSupercolumn.Column.Timestamp = now.UnixNano()
+	mmap[string(key)]["certificate"] = append(
+		mmap[string(key)]["certificate"], mutation)
+
+	mutation = cassandra.NewMutation()
+	mutation.ColumnOrSupercolumn = cassandra.NewColumnOrSuperColumn()
+	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
+	mutation.ColumnOrSupercolumn.Column.Name = []byte("issuer")
+	mutation.ColumnOrSupercolumn.Column.Value = formatCertSubject(cert.Issuer)
+	mutation.ColumnOrSupercolumn.Column.Timestamp = now.UnixNano()
+	mmap[string(key)]["certificate"] = append(
+		mmap[string(key)]["certificate"], mutation)
+
+	expires = uint64(cert.NotAfter.Unix())
+
+	mutation = cassandra.NewMutation()
+	mutation.ColumnOrSupercolumn = cassandra.NewColumnOrSuperColumn()
+	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
+	mutation.ColumnOrSupercolumn.Column.Name = []byte("expires")
+	mutation.ColumnOrSupercolumn.Column.Value = make([]byte, 8)
+	binary.BigEndian.PutUint64(mutation.ColumnOrSupercolumn.Column.Value, expires)
+	mutation.ColumnOrSupercolumn.Column.Timestamp = now.UnixNano()
+	mmap[string(key)]["certificate"] = append(
+		mmap[string(key)]["certificate"], mutation)
+
+	// Commit the data into the database.
+	ire, ue, te, err = db.db.BatchMutate(mmap, cassandra.ConsistencyLevel_QUORUM)
+	if ire != nil {
+		return errors.New(ire.Why)
+	}
+	if ue != nil {
+		return errors.New("Unavailable")
+	}
+	if te != nil {
+		return errors.New("Timed out")
+	}
+	return err
 }
