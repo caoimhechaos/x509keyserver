@@ -45,12 +45,14 @@ func main() {
 	var ks *x509keyserver.X509KeyServer
 	var kdb *x509keyserver.X509KeyDB
 	var bind string
-	var tmpl_path string
+	var tmpl_path, static_path string
 	var dbserver, keyspace string
 	var err error
 
 	flag.StringVar(&bind, "bind", "[::]:8080",
 		"host:port pair to bind the HTTP/RPC server to")
+	flag.StringVar(&static_path, "static-path", ".",
+		"Path to the required static files for the web interface")
 	flag.StringVar(&tmpl_path, "template", "keylist.html",
 		"Path to the template file for displaying")
 
@@ -83,10 +85,14 @@ func main() {
 	// Tell the HTTP server to handle RPCs.
 	rpc.HandleHTTP()
 
-	err = http.ListenAndServe(bind, &x509keyserver.HTTPKeyService{
+	http.Handle("/", &x509keyserver.HTTPKeyService{
 		Db:   kdb,
 		Tmpl: tmpl,
 	})
+	http.Handle("/css/", http.FileServer(http.Dir(static_path)))
+	http.Handle("/js/", http.FileServer(http.Dir(static_path)))
+
+	err = http.ListenAndServe(bind, nil)
 	if err != nil {
 		log.Fatal("Error binding to ", bind, ": ", err)
 	}
