@@ -32,6 +32,8 @@
 package x509keyserver
 
 import (
+	"crypto/x509"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -60,8 +62,30 @@ func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var key *X509KeyData
 	var expanded []*httpExpandedKey
 	var startidx uint64
-	var startidx_str = req.PostFormValue("start")
+	var startidx_str = req.FormValue("start")
+	var display string = req.FormValue("display")
 	var err error
+
+	if display != "" {
+		var cert *x509.Certificate
+		startidx, err = strconv.ParseUint(display, 10, 64)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(err.Error()))
+			return
+		}
+		cert, err = ks.Db.RetrieveCertificateByIndex(startidx)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte(err.Error()))
+			return
+		}
+		rw.Header().Set("Content-Disposition",
+			fmt.Sprintf("attachment; filename=%d.der", startidx))
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(cert.Raw)
+		return
+	}
 
 	if startidx_str != "" {
 		startidx, err = strconv.ParseUint(startidx_str, 10, 64)

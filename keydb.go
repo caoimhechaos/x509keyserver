@@ -181,7 +181,7 @@ func (db *X509KeyDB) RetrieveCertificateByIndex(index uint64) (*x509.Certificate
 	var nfe *cassandra.NotFoundException
 	var ue *cassandra.UnavailableException
 	var te *cassandra.TimedOutException
-	var key []byte
+	var key []byte = make([]byte, 8)
 	var err error
 
 	binary.BigEndian.PutUint64(key, index)

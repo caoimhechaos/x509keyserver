@@ -18,10 +18,10 @@
  	  <tbody>
 {{range .Certs}}
 		<tr>
-		  <td>{{.Pb.GetIndex}}</td>
-		  <td>{{.Pb.GetSubject}}</td>
-		  <td>{{.Pb.GetIssuer}}</td>
-		  <td>{{.Expires}}</td>
+		  <td><a href="/?display={{.Pb.GetIndex}}">{{.Pb.GetIndex}}</a></td>
+		  <td><a href="/?display={{.Pb.GetIndex}}">{{.Pb.GetSubject}}</a></td>
+		  <td><a href="/?display={{.Pb.GetIndex}}">{{.Pb.GetIssuer}}</a></td>
+		  <td><a href="/?display={{.Pb.GetIndex}}">{{.Expires}}</a></td>
 		</tr>
 {{else}}
 		<tr>
