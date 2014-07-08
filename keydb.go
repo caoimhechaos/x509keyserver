@@ -259,6 +259,15 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	mmap[string(key)]["certificate"] = append(
 		mmap[string(key)]["certificate"], mutation)
 
+	mutation = cassandra.NewMutation()
+	mutation.ColumnOrSupercolumn = cassandra.NewColumnOrSuperColumn()
+	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
+	mutation.ColumnOrSupercolumn.Column.Name = []byte("der_certificate")
+	mutation.ColumnOrSupercolumn.Column.Value = cert.Raw
+	mutation.ColumnOrSupercolumn.Column.Timestamp = now.UnixNano()
+	mmap[string(key)]["certificate"] = append(
+		mmap[string(key)]["certificate"], mutation)
+
 	// Commit the data into the database.
 	ire, ue, te, err = db.db.BatchMutate(mmap, cassandra.ConsistencyLevel_QUORUM)
 	if ire != nil {
