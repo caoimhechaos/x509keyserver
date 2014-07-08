@@ -120,6 +120,7 @@ func (db *X509KeyDB) ListCertificates(start_index uint64, count int32) ([]*X509K
 	pred.ColumnNames = certificate_DisplayColumns
 
 	if start_index > 0 {
+		kr.StartKey = make([]byte, 8)
 		binary.BigEndian.PutUint64(kr.StartKey, start_index)
 	} else {
 		kr.StartKey = make([]byte, 0)

@@ -53,6 +53,7 @@ type httpExpandedKey struct {
 
 type templateData struct {
 	Certs []*httpExpandedKey
+	Next  uint64
 	Error string
 }
 
@@ -61,7 +62,7 @@ func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var keydata []*X509KeyData
 	var key *X509KeyData
 	var expanded []*httpExpandedKey
-	var startidx uint64
+	var startidx, next uint64
 	var startidx_str = req.FormValue("start")
 	var display string = req.FormValue("display")
 	var err error
@@ -108,9 +109,11 @@ func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		expkey.Pb = key
 		expkey.Expires = time.Unix(int64(key.GetExpires()), 0)
 		expanded = append(expanded, expkey)
+		next = key.GetIndex() + 1
 	}
 
 	ks.Tmpl.Execute(rw, &templateData{
 		Certs: expanded,
+		Next:  next,
 	})
 }
