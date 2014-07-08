@@ -29,13 +29,15 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package keyserver
+package x509keyserver
 
 import (
 	"crypto/x509"
 	"database/cassandra"
 	"encoding/binary"
 	"errors"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 // Object for retrieving X.509 certificates from the Cassandra database.
@@ -44,6 +46,9 @@ type X509KeyDB struct {
 }
 
 // List of all column names in the certificate column family.
+var certificate_DisplayColumns [][]byte = [][]byte{
+	[]byte("subject"), []byte("issuer"), []byte("expires"),
+}
 var certificate_AllColumns [][]byte = [][]byte{
 	[]byte("subject"), []byte("issuer"), []byte("expires"), []byte("der_certificate"),
 }
@@ -70,6 +75,75 @@ func NewX509KeyDB(dbserver, keyspace string) (*X509KeyDB, error) {
 	return &X509KeyDB{
 		db: client,
 	}, nil
+}
+
+// List the next "count" known certificates starting from "start_index".
+func (db *X509KeyDB) ListCertificates(start_index uint64, count int32) ([]*X509KeyData, error) {
+	var ret []*X509KeyData
+	var cp *cassandra.ColumnParent = cassandra.NewColumnParent()
+	var pred *cassandra.SlicePredicate = cassandra.NewSlicePredicate()
+	var kr *cassandra.KeyRange = cassandra.NewKeyRange()
+	var r []*cassandra.KeySlice
+	var ks *cassandra.KeySlice
+	var ire *cassandra.InvalidRequestException
+	var ue *cassandra.UnavailableException
+	var te *cassandra.TimedOutException
+	var err error
+
+	cp.ColumnFamily = "certificate"
+	pred.ColumnNames = certificate_DisplayColumns
+
+	if start_index > 0 {
+		binary.BigEndian.PutUint64(kr.StartKey, start_index)
+	} else {
+		kr.StartKey = make([]byte, 0)
+	}
+	kr.EndKey = make([]byte, 0)
+	kr.Count = count
+
+	r, ire, ue, te, err = db.db.GetRangeSlices(cp, pred, kr,
+		cassandra.ConsistencyLevel_ONE)
+	if ire != nil {
+		return ret, errors.New(ire.Why)
+	}
+	if ue != nil {
+		return ret, errors.New("Unavailable")
+	}
+	if te != nil {
+		return ret, errors.New("Timed out")
+	}
+	if err != nil {
+		return ret, err
+	}
+
+	for _, ks = range r {
+		var rv *X509KeyData = new(X509KeyData)
+		var cos *cassandra.ColumnOrSuperColumn
+		rv.Index = proto.Uint64(binary.BigEndian.Uint64(ks.Key))
+
+		for _, cos = range ks.Columns {
+			var col *cassandra.Column = cos.Column
+			if col != nil {
+				continue
+			}
+
+			if string(col.Name) == "subject" {
+				rv.Subject = proto.String(string(col.Value))
+			} else if string(col.Name) == "issuer" {
+				rv.Issuer = proto.String(string(col.Value))
+			} else if string(col.Name) == "issuer" {
+				rv.Issuer = proto.String(string(col.Value))
+			} else if string(col.Name) == "expires" {
+				rv.Expires = proto.Uint64(binary.BigEndian.Uint64(col.Value))
+			} else {
+				return ret, errors.New("Unexpected column: " + string(col.Name))
+			}
+		}
+
+		ret = append(ret, rv)
+	}
+
+	return ret, nil
 }
 
 // Retrieve the certificate with the given index number from the database.
