@@ -19,3 +19,32 @@ message X509KeyData {
 	// Optional actual certificate content.
 	optional bytes der_certificate = 5;
 }
+
+// List of X509KeyData objects (list of certificate metadata).
+message X509KeyDataList {
+	// The individual certificate metadata records. 
+	repeated X509KeyData records = 1;
+}
+
+// Request for a list of certificates.
+message X509KeyDataListRequest {
+	// Index from which to start enumerating certificates.
+	required uint64 start_index = 1;
+
+	// Number of elements to display.
+	required int32 count = 2 [default=20];
+}
+
+// Request for an individual X.509 certificate by its index.
+message X509KeyDataRequest {
+	// Index number of the certificate to be requested.
+	required uint64 index = 1;
+}
+
+service X509KeyServer {
+	// List the next number of known certificates starting from the start index.
+	rpc ListCertificates (X509KeyDataListRequest) returns (X509KeyDataList);
+
+	// Retrieve the certificate with the given index number from the database.
+	rpc RetrieveCertificateByIndex (X509KeyDataRequest) returns (X509KeyData);
+}
