@@ -24,5 +24,6 @@ _testmain.go
 *.exe
 *.test
 
-x509keyserver/x509keyserver
 add_cert/add_cert
+x509keycli/x509keycli
+x509keyserver/x509keyserver
