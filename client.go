@@ -32,9 +32,13 @@
 package x509keyserver
 
 import (
+	"bufio"
 	"code.google.com/p/goprotobuf/proto"
 	"crypto/x509"
 	"expvar"
+	"github.com/tonnerre/go-urlconnection"
+	"net"
+	"net/http"
 	"net/rpc"
 	"sync"
 	"time"
@@ -72,16 +76,27 @@ func NewX509KeyClient(
 	max_size int,
 	cache_prune_interval time.Duration) (*X509KeyClient, error) {
 	var ret *X509KeyClient
-	var client *rpc.Client
+	var conn net.Conn
 	var err error
 
-	client, err = rpc.DialHTTP("tcp", server)
+	conn, err = urlconnection.Connect(server)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = conn.Write([]byte("CONNECT " + rpc.DefaultRPCPath +
+		" HTTP/1.0\n\n"))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
 	if err != nil {
 		return nil, err
 	}
 
 	ret = &X509KeyClient{
-		client:               client,
+		client:               rpc.NewClient(conn),
 		key_cache:            make(map[uint64]*cacheRecord),
 		max_cache_size:       max_size,
 		cache_prune_interval: cache_prune_interval,
