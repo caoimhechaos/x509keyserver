@@ -40,7 +40,7 @@ import (
 	"fmt"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 // Object for retrieving X.509 certificates from the Cassandra database.

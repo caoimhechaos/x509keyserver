@@ -41,8 +41,8 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
 	"github.com/caoimhechaos/go-urlconnection"
+	"github.com/golang/protobuf/proto"
 )
 
 // Implementation of the X.509 key server RPC interface from the client side.

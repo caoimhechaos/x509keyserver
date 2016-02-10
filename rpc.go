@@ -34,7 +34,7 @@ package x509keyserver
 import (
 	"crypto/x509"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 // Implementation of the X.509 key server RPC interface.
