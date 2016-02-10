@@ -32,7 +32,7 @@
 package x509keyserver
 
 import (
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/cassandra"

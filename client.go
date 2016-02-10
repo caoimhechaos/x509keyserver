@@ -33,7 +33,7 @@ package x509keyserver
 
 import (
 	"bufio"
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"crypto/x509"
 	"expvar"
 	"github.com/tonnerre/go-urlconnection"
