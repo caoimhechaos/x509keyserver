@@ -1,5 +1,5 @@
 /*
- * (c) 2014, Tonnerre Lombard <tonnerre@ancient-solutions.com>,
+ * (c) 2014-2016, Tonnerre Lombard <tonnerre@ancient-solutions.com>,
  *	     Starship Factory. All rights reserved.
  *
  * Redistribution and use in source  and binary forms, with or without
@@ -43,13 +43,13 @@ import (
 
 func main() {
 	var kc *x509keyserver.X509KeyClient
-	var fetch_interval, cache_prune_interval time.Duration
+	var fetch_interval, cache_prune_interval, timeout time.Duration
 	var server, fetch_ids, id string
 	var fetch_idlist []string
 	var max_records int
 	var err error
 
-	flag.StringVar(&server, "server", "localhost:8080",
+	flag.StringVar(&server, "server", "localhost:1234",
 		"host:port pair of the x509 key server")
 	flag.IntVar(&max_records, "max-cache-records", 4,
 		"Maximum number of certificates to keep in the cache")
@@ -59,9 +59,12 @@ func main() {
 		"How long to wait between individual fetches (to test caching)")
 	flag.DurationVar(&cache_prune_interval, "cache-prune-interval", time.Second,
 		"How long to wait between two cache prunes (to test caching)")
+	flag.DurationVar(&timeout, "timeout", 100*time.Millisecond,
+		"How long to wait for server responses before cancelling them")
 	flag.Parse()
 
-	kc, err = x509keyserver.NewX509KeyClient(server, max_records, time.Second)
+	kc, err = x509keyserver.NewX509KeyClient(
+		server, max_records, timeout, cache_prune_interval)
 	if err != nil {
 		log.Fatal("Unable to connect to ", server, ": ", err)
 	}

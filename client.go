@@ -1,5 +1,5 @@
 /*
- * (c) 2014, Tonnerre Lombard <tonnerre@ancient-solutions.com>,
+ * (c) 2014-2016, Tonnerre Lombard <tonnerre@ancient-solutions.com>,
  *	     Starship Factory. All rights reserved.
  *
  * Redistribution and use in source  and binary forms, with or without
@@ -32,14 +32,12 @@
 package x509keyserver
 
 import (
-	"bufio"
-	"github.com/golang/protobuf/proto"
 	"crypto/x509"
 	"expvar"
+	"github.com/golang/protobuf/proto"
 	"github.com/tonnerre/go-urlconnection"
-	"net"
-	"net/http"
-	"net/rpc"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"sync"
 	"time"
 )
@@ -49,10 +47,11 @@ import (
 // "max_cache_size" records in its cache. They never expire since certificate
 // index numbers shouldn't be reused and should therefor be unique.
 type X509KeyClient struct {
-	client               *rpc.Client
+	client               X509KeyServerClient
 	key_cache            map[uint64]*cacheRecord
 	cache_lock           sync.RWMutex
 	max_cache_size       int
+	timeout              time.Duration
 	cache_prune_interval time.Duration
 }
 
@@ -74,31 +73,24 @@ var key_cache_errors = expvar.NewMap("x509-key-cache-errors")
 func NewX509KeyClient(
 	server string,
 	max_size int,
+	timeout time.Duration,
 	cache_prune_interval time.Duration) (*X509KeyClient, error) {
+	var conn *grpc.ClientConn
 	var ret *X509KeyClient
-	var conn net.Conn
 	var err error
 
-	conn, err = urlconnection.Connect(server)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = conn.Write([]byte("CONNECT " + rpc.DefaultRPCPath +
-		" HTTP/1.0\n\n"))
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
+	conn, err = grpc.Dial(server,
+		grpc.WithDialer(urlconnection.ConnectTimeout),
+		grpc.WithTimeout(timeout))
 	if err != nil {
 		return nil, err
 	}
 
 	ret = &X509KeyClient{
-		client:               rpc.NewClient(conn),
+		client:               NewX509KeyServerClient(conn),
 		key_cache:            make(map[uint64]*cacheRecord),
 		max_cache_size:       max_size,
+		timeout:              timeout,
 		cache_prune_interval: cache_prune_interval,
 	}
 
@@ -140,11 +132,14 @@ func (cl *X509KeyClient) TrimCache() {
 
 // Retrieve the certificate associated with the given key ID.
 func (cl *X509KeyClient) RetrieveCertificateByIndex(index uint64) (*x509.Certificate, error) {
-	var res X509KeyData
+	var res *X509KeyData
+	var c context.Context
 	var cert *x509.Certificate
 	var cr *cacheRecord
 	var err error
 	var ok bool
+
+	c, _ = context.WithTimeout(context.Background(), cl.timeout)
 
 	key_cache_requests.Add(1)
 
@@ -158,9 +153,8 @@ func (cl *X509KeyClient) RetrieveCertificateByIndex(index uint64) (*x509.Certifi
 	cl.cache_lock.RUnlock()
 
 	key_cache_misses.Add(1)
-	err = cl.client.Call(
-		"X509KeyServer.RetrieveCertificateByIndex",
-		X509KeyDataRequest{Index: proto.Uint64(index)}, &res)
+	res, err = cl.client.RetrieveCertificateByIndex(
+		c, &X509KeyDataRequest{Index: proto.Uint64(index)})
 	if err != nil {
 		key_cache_errors.Add(err.Error(), 1)
 		return nil, err
