@@ -1,5 +1,5 @@
 /*
- * (c) 2014, Caoimhe Chaos <caoimhechaos@protonmail.com>,
+ * (c) 2014-2016, Caoimhe Chaos <caoimhechaos@protonmail.com>,
  *	     Starship Factory. All rights reserved.
  *
  * Redistribution and use in source  and binary forms, with or without
@@ -35,6 +35,7 @@ import (
 	"crypto/x509"
 
 	"github.com/golang/protobuf/proto"
+	"golang.org/x/net/context"
 )
 
 // Implementation of the X.509 key server RPC interface.
@@ -43,19 +44,24 @@ type X509KeyServer struct {
 }
 
 // List the next number of known certificates starting from the start index.
-func (s *X509KeyServer) ListCertificates(req X509KeyDataListRequest, res *X509KeyDataList) error {
-	var err error
+func (s *X509KeyServer) ListCertificates(
+	c context.Context, req *X509KeyDataListRequest) (
+	res *X509KeyDataList, err error) {
+	res = new(X509KeyDataList)
 	res.Records, err = s.Db.ListCertificates(req.GetStartIndex(), req.GetCount())
-	return err
+	return
 }
 
 // Retrieve the certificate with the given index number from the database.
-func (s *X509KeyServer) RetrieveCertificateByIndex(req X509KeyDataRequest, ret *X509KeyData) error {
+func (s *X509KeyServer) RetrieveCertificateByIndex(
+	c context.Context, req *X509KeyDataRequest) (
+	ret *X509KeyData, err error) {
 	var cert *x509.Certificate
-	var err error
+
+	ret = new(X509KeyData)
 	cert, err = s.Db.RetrieveCertificateByIndex(req.GetIndex())
 	if err != nil {
-		return err
+		return
 	}
 
 	ret.DerCertificate = cert.Raw
@@ -64,5 +70,5 @@ func (s *X509KeyServer) RetrieveCertificateByIndex(req X509KeyDataRequest, ret *
 	ret.Issuer = proto.String(string(formatCertSubject(cert.Issuer)))
 	ret.Subject = proto.String(string(formatCertSubject(cert.Subject)))
 
-	return nil
+	return
 }

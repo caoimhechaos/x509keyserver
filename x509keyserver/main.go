@@ -1,5 +1,5 @@
 /*
- * (c) 2014, Caoimhe Chaos <caoimhechaos@protonmail.com>,
+ * (c) 2014-2016, Caoimhe Chaos <caoimhechaos@protonmail.com>,
  *	     Starship Factory. All rights reserved.
  *
  * Redistribution and use in source  and binary forms, with or without
@@ -35,23 +35,28 @@ import (
 	"flag"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
-	"net/rpc"
 
 	"github.com/caoimhechaos/x509keyserver"
+	"google.golang.org/grpc"
 )
 
 func main() {
 	var tmpl *template.Template
 	var ks *x509keyserver.X509KeyServer
 	var kdb *x509keyserver.X509KeyDB
-	var bind string
+	var http_bind, bind string
 	var tmpl_path, static_path string
 	var dbserver, keyspace string
+	var server *grpc.Server
+	var l net.Listener
 	var err error
 
-	flag.StringVar(&bind, "bind", "[::]:8080",
-		"host:port pair to bind the HTTP/RPC server to")
+	flag.StringVar(&bind, "bind", "[::]:1234",
+		"host:port pair to bind the RPC server to")
+	flag.StringVar(&http_bind, "bind-http", "",
+		"host:port pair to bind the HTTP server to")
 	flag.StringVar(&static_path, "static-path", ".",
 		"Path to the required static files for the web interface")
 	flag.StringVar(&tmpl_path, "template", "keylist.html",
@@ -73,28 +78,37 @@ func main() {
 	}
 
 	// Register the RPC service.
-	err = rpc.Register(ks)
+	l, err = net.Listen("tcp", bind)
 	if err != nil {
-		log.Fatal("Error registering RPC handler for the key server: ", err)
+		log.Fatal("Error listening on ", bind, ": ", err)
 	}
 
-	tmpl, err = template.ParseFiles(tmpl_path)
-	if err != nil {
-		log.Fatal("Error parsing template ", tmpl_path, ": ", err)
-	}
+	server = grpc.NewServer()
+	x509keyserver.RegisterX509KeyServerServer(server, ks)
 
-	// Tell the HTTP server to handle RPCs.
-	rpc.HandleHTTP()
+	// Prepare the HTTP server
+	if len(http_bind) > 0 {
+		tmpl, err = template.ParseFiles(tmpl_path)
+		if err != nil {
+			log.Fatal("Error parsing template ", tmpl_path, ": ", err)
+		}
 
-	http.Handle("/", &x509keyserver.HTTPKeyService{
-		Db:   kdb,
-		Tmpl: tmpl,
-	})
-	http.Handle("/css/", http.FileServer(http.Dir(static_path)))
-	http.Handle("/js/", http.FileServer(http.Dir(static_path)))
+		http.Handle("/", &x509keyserver.HTTPKeyService{
+			Db:   kdb,
+			Tmpl: tmpl,
+		})
+		http.Handle("/css/", http.FileServer(http.Dir(static_path)))
+		http.Handle("/js/", http.FileServer(http.Dir(static_path)))
 
-	err = http.ListenAndServe(bind, nil)
-	if err != nil {
-		log.Fatal("Error binding to ", bind, ": ", err)
+		go server.Serve(l)
+		err = http.ListenAndServe(http_bind, nil)
+		if err != nil {
+			log.Fatal("Error binding to ", http_bind, ": ", err)
+		}
+	} else {
+		err = server.Serve(l)
+		if err != nil {
+			log.Fatal("Error serving RPCs on ", bind, ": ", err)
+		}
 	}
 }
