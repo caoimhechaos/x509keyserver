@@ -1,0 +1,5 @@
+#
+# X509KEYSERVER_FLAGS specifies the flags to pass to the x509 keyserver
+# binary.
+#
+X509KEYSERVER_FLAGS=""

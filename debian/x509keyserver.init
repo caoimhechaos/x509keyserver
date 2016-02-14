@@ -1,0 +1,66 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:		x509keyserver
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Should-Start:		$named
+# Should-Stop:		$named
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	X.509 keyserver
+# Description:		X.509 keyserver
+### END INIT INFO
+#
+# x509keyserver - X.509 key server
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/bin/x509keyserver
+DESC="X.509 keyserver"
+NAME=x509keyserver
+
+# Exit if the daemon does not exist (anymore)
+test -f $DAEMON || exit 0
+
+. /lib/lsb/init-functions
+
+X509KEYSERVER_FLAGS=""
+[ -f "/etc/default/${NAME}" ] && . "/etc/default/${NAME}"
+
+# The real work of an init script
+case "$1" in
+start)
+	log_daemon_msg "Starting $DESC" "$NAME"
+	start_daemon /usr/bin/run-as-daemon -l =logger	\
+		-p "/var/run/${NAME}.pid" -- $DAEMON $X509KEYSERVER_FLAGS
+	log_end_msg $?
+	;;
+stop)
+	log_daemon_msg "Stopping $DESC" "$NAME"
+	kill $(cat "/var/run/${NAME}.pid")
+	log_end_msg $?
+	;;
+restart|force-reload)
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	kill $(cat "/var/run/${NAME}.pid")
+	start_daemon /usr/bin/run-as-daemon -l =logger	\
+		-p "/var/run/${NAME}.pid" -- $DAEMON $X509KEYSERVER_FLAGS
+	echo "."
+	;;
+status)
+	pidofproc $DAEMON >/dev/null
+	status=$?
+	if [ $status -eq 0 ]; then
+		log_success_msg "$NAME is running"
+	else
+		log_success_msg "$NAME is not running"
+	fi
+	exit $status
+	;;
+*)
+	echo "Usage: $0 {start|stop|restart|force-reload|status}"
+	exit 1
+	;;
+esac
+
+# Fallthrough if work done.
+exit 0
