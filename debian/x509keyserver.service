@@ -1,0 +1,10 @@
+[Unit]
+Description=X.509 Keyserver
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/x509keyserver
+ExecStart=/usr/bin/x509keyserver $X509KEYSERVER_FLAGS
+
+[Install]
+WantedBy=multi-user.target
