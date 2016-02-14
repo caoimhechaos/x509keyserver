@@ -20,7 +20,8 @@ Description: X.509 key server implementation in Go
 Package: golang-x509keyserver-dev
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, golang-urlconnection-dev,
- golang-goprotobuf-dev, golang-cassandra-dev, golang-urlconnection-dev
+ golang-goprotobuf-dev, golang-cassandra-dev, golang-golang-x-net-dev,
+ golang-google-grpc-dev, golang-etcd-dev
 Description: Library for the X.509 key server
  Client library for requesting certificates from the X.509 keyserver.
  The library keeps a cache of certificates of a given size and will
