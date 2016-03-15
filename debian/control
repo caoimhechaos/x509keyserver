@@ -4,8 +4,8 @@ Priority: extra
 Maintainer: Caoimhe Chaos <caoimhechaos@protonmail.com>
 Homepage: http://x509.ancient-solutions.com/
 Build-Depends: debhelper (>= 9), golang-go, dh-golang, golang-goprotobuf-dev,
- golang-urlconnection-dev, golang-cassandra-dev, golang-golang-x-net-dev,
- golang-google-grpc-dev, golang-etcd-dev, protobuf-compiler
+ golang-urlconnection-dev, golang-cassandra-dev, golang-etcd-dev,
+ protobuf-compiler
 Standards-Version: 3.9.5
 Vcs-Git: http://git.ancient-solutions.com/nettools/x509keyserver.git
 Vcs-Browser: http://git.ancient-solutions.com/cgi-bin/gitweb.cgi?p=nettools/x509keyserver.git;a=summary

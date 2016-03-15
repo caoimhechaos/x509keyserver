@@ -1,4 +1,4 @@
-golang-x509keyserver (0.2-1) unstable; urgency=low
+golang-x509keyserver (0.1.1-1~jessie1) stable; urgency=low
 
   * Initial release
 
