@@ -1,3 +1,9 @@
+golang-x509keyserver (0.2.1-1) unstable; urgency=medium
+
+  * Update to new Cassandra API.
+
+ -- Caoimhe Chaos <caoimhechaos@protonmail.com>  Tue, 15 Mar 2016 01:48:04 +0100
+
 golang-x509keyserver (0.2-2) unstable; urgency=medium
 
   * Update source package dependencies.
