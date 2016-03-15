@@ -48,12 +48,6 @@ type X509KeyDB struct {
 	db *cassandra.RetryCassandraClient
 }
 
-func mkint64(v int64) *int64 {
-	var rv *int64 = new(int64)
-	*rv = v
-	return rv
-}
-
 // List of all column names in the certificate column family.
 var certificate_DisplayColumns [][]byte = [][]byte{
 	[]byte("subject"), []byte("issuer"), []byte("expires"),
@@ -128,7 +122,8 @@ func (db *X509KeyDB) ListCertificates(start_index uint64, count int32) ([]*X509K
 	kr.EndKey = make([]byte, 0)
 	kr.Count = count
 
-	r, err = db.db.GetRangeSlices(cp, pred, kr, cassandra.ConsistencyLevel_ONE)
+	r, err = db.db.GetRangeSlices(cp, pred, kr,
+		cassandra.ConsistencyLevel_ONE)
 	if err != nil {
 		return ret, err
 	}
@@ -194,6 +189,7 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	var mutation *cassandra.Mutation
 	var expires uint64
 	var key []byte = make([]byte, 8)
+	var ts int64 = now.UnixNano() / 1000
 
 	binary.BigEndian.PutUint64(key, cert.SerialNumber.Uint64())
 	mmap[string(key)] = make(map[string][]*cassandra.Mutation)
@@ -204,7 +200,7 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
 	mutation.ColumnOrSupercolumn.Column.Name = []byte("subject")
 	mutation.ColumnOrSupercolumn.Column.Value = formatCertSubject(cert.Subject)
-	mutation.ColumnOrSupercolumn.Column.Timestamp = mkint64(now.UnixNano())
+	mutation.ColumnOrSupercolumn.Column.Timestamp = &ts
 	mmap[string(key)]["certificate"] = append(
 		mmap[string(key)]["certificate"], mutation)
 
@@ -213,7 +209,7 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
 	mutation.ColumnOrSupercolumn.Column.Name = []byte("issuer")
 	mutation.ColumnOrSupercolumn.Column.Value = formatCertSubject(cert.Issuer)
-	mutation.ColumnOrSupercolumn.Column.Timestamp = mkint64(now.UnixNano())
+	mutation.ColumnOrSupercolumn.Column.Timestamp = &ts
 	mmap[string(key)]["certificate"] = append(
 		mmap[string(key)]["certificate"], mutation)
 
@@ -225,7 +221,7 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	mutation.ColumnOrSupercolumn.Column.Name = []byte("expires")
 	mutation.ColumnOrSupercolumn.Column.Value = make([]byte, 8)
 	binary.BigEndian.PutUint64(mutation.ColumnOrSupercolumn.Column.Value, expires)
-	mutation.ColumnOrSupercolumn.Column.Timestamp = mkint64(now.UnixNano())
+	mutation.ColumnOrSupercolumn.Column.Timestamp = &ts
 	mmap[string(key)]["certificate"] = append(
 		mmap[string(key)]["certificate"], mutation)
 
@@ -234,7 +230,7 @@ func (db *X509KeyDB) AddX509Certificate(cert *x509.Certificate) error {
 	mutation.ColumnOrSupercolumn.Column = cassandra.NewColumn()
 	mutation.ColumnOrSupercolumn.Column.Name = []byte("der_certificate")
 	mutation.ColumnOrSupercolumn.Column.Value = cert.Raw
-	mutation.ColumnOrSupercolumn.Column.Timestamp = mkint64(now.UnixNano())
+	mutation.ColumnOrSupercolumn.Column.Timestamp = &ts
 	mmap[string(key)]["certificate"] = append(
 		mmap[string(key)]["certificate"], mutation)
 
