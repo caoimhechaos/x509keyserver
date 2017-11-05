@@ -1,3 +1,4 @@
+syntax = "proto2";
 package x509keyserver;
 
 // Individual key list entry for listing keys; you will still have to
