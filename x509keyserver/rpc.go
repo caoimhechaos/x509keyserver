@@ -29,36 +29,40 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package x509keyserver
+package main
 
 import (
 	"crypto/x509"
 
+	"github.com/caoimhechaos/x509keyserver"
+	"github.com/caoimhechaos/x509keyserver/keydb"
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 )
 
-// Implementation of the X.509 key server RPC interface.
+// X509KeyServer implements the X.509 key server RPC interface.
 type X509KeyServer struct {
-	Db *X509KeyDB
+	Db *keydb.X509KeyDB
 }
 
-// List the next number of known certificates starting from the start index.
+// ListCertificates lists the next number of known certificates starting from
+// the specified start index.
 func (s *X509KeyServer) ListCertificates(
-	c context.Context, req *X509KeyDataListRequest) (
-	res *X509KeyDataList, err error) {
-	res = new(X509KeyDataList)
+	c context.Context, req *x509keyserver.X509KeyDataListRequest) (
+	res *x509keyserver.X509KeyDataList, err error) {
+	res = new(x509keyserver.X509KeyDataList)
 	res.Records, err = s.Db.ListCertificates(req.GetStartIndex(), req.GetCount())
 	return
 }
 
-// Retrieve the certificate with the given index number from the database.
+// RetrieveCertificateByIndex retrieves the certificate with the given index
+// number assigned by the issuer from the database.
 func (s *X509KeyServer) RetrieveCertificateByIndex(
-	c context.Context, req *X509KeyDataRequest) (
-	ret *X509KeyData, err error) {
+	c context.Context, req *x509keyserver.X509KeyDataRequest) (
+	ret *x509keyserver.X509KeyData, err error) {
 	var cert *x509.Certificate
 
-	ret = new(X509KeyData)
+	ret = new(x509keyserver.X509KeyData)
 	cert, err = s.Db.RetrieveCertificateByIndex(req.GetIndex())
 	if err != nil {
 		return
@@ -67,8 +71,8 @@ func (s *X509KeyServer) RetrieveCertificateByIndex(
 	ret.DerCertificate = cert.Raw
 	ret.Expires = proto.Uint64(uint64(cert.NotAfter.Unix()))
 	ret.Index = proto.Uint64(req.GetIndex())
-	ret.Issuer = proto.String(string(formatCertSubject(cert.Issuer)))
-	ret.Subject = proto.String(string(formatCertSubject(cert.Subject)))
+	ret.Issuer = proto.String(string(keydb.FormatCertSubject(cert.Issuer)))
+	ret.Subject = proto.String(string(keydb.FormatCertSubject(cert.Subject)))
 
 	return
 }

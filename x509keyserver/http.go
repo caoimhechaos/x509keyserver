@@ -29,7 +29,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package x509keyserver
+package main
 
 import (
 	"crypto/x509"
@@ -38,16 +38,19 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/caoimhechaos/x509keyserver"
+	"github.com/caoimhechaos/x509keyserver/keydb"
 )
 
 // HTTP service to display known keys in a web site.
 type HTTPKeyService struct {
-	Db   *X509KeyDB
+	Db   *keydb.X509KeyDB
 	Tmpl *template.Template
 }
 
 type httpExpandedKey struct {
-	Pb      *X509KeyData
+	Pb      *x509keyserver.X509KeyData
 	Expires time.Time
 }
 
@@ -59,11 +62,11 @@ type templateData struct {
 
 // Display a list of all known X.509 certificates.
 func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	var keydata []*X509KeyData
-	var key *X509KeyData
+	var keydata []*x509keyserver.X509KeyData
+	var key *x509keyserver.X509KeyData
 	var expanded []*httpExpandedKey
 	var startidx, next uint64
-	var startidx_str = req.FormValue("start")
+	var startidxStr = req.FormValue("start")
 	var display string = req.FormValue("display")
 	var err error
 
@@ -88,8 +91,8 @@ func (ks *HTTPKeyService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if startidx_str != "" {
-		startidx, err = strconv.ParseUint(startidx_str, 10, 64)
+	if startidxStr != "" {
+		startidx, err = strconv.ParseUint(startidxStr, 10, 64)
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte(err.Error()))

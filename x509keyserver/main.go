@@ -39,15 +39,16 @@ import (
 	"net/http"
 
 	"github.com/caoimhechaos/x509keyserver"
+	"github.com/caoimhechaos/x509keyserver/keydb"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	var tmpl *template.Template
-	var ks *x509keyserver.X509KeyServer
-	var kdb *x509keyserver.X509KeyDB
-	var http_bind, bind string
-	var tmpl_path, static_path string
+	var ks *X509KeyServer
+	var kdb *keydb.X509KeyDB
+	var httpBind, bind string
+	var tmplPath, staticPath string
 	var dbserver, keyspace string
 	var server *grpc.Server
 	var l net.Listener
@@ -55,11 +56,11 @@ func main() {
 
 	flag.StringVar(&bind, "bind", "[::]:1234",
 		"host:port pair to bind the RPC server to")
-	flag.StringVar(&http_bind, "bind-http", "",
+	flag.StringVar(&httpBind, "bind-http", "",
 		"host:port pair to bind the HTTP server to")
-	flag.StringVar(&static_path, "static-path", ".",
+	flag.StringVar(&staticPath, "static-path", ".",
 		"Path to the required static files for the web interface")
-	flag.StringVar(&tmpl_path, "template", "keylist.html",
+	flag.StringVar(&tmplPath, "template", "keylist.html",
 		"Path to the template file for displaying")
 
 	flag.StringVar(&dbserver, "cassandra-server", "localhost:9160",
@@ -69,11 +70,11 @@ func main() {
 	flag.Parse()
 
 	// Set up the connection to the key database.
-	kdb, err = x509keyserver.NewX509KeyDB(dbserver, keyspace)
+	kdb, err = keydb.NewX509KeyDB(dbserver, keyspace)
 	if err != nil {
 		log.Fatal("Error connecting to key database: ", err)
 	}
-	ks = &x509keyserver.X509KeyServer{
+	ks = &X509KeyServer{
 		Db: kdb,
 	}
 
@@ -87,23 +88,23 @@ func main() {
 	x509keyserver.RegisterX509KeyServerServer(server, ks)
 
 	// Prepare the HTTP server
-	if len(http_bind) > 0 {
-		tmpl, err = template.ParseFiles(tmpl_path)
+	if len(httpBind) > 0 {
+		tmpl, err = template.ParseFiles(tmplPath)
 		if err != nil {
-			log.Fatal("Error parsing template ", tmpl_path, ": ", err)
+			log.Fatal("Error parsing template ", tmplPath, ": ", err)
 		}
 
-		http.Handle("/", &x509keyserver.HTTPKeyService{
+		http.Handle("/", &HTTPKeyService{
 			Db:   kdb,
 			Tmpl: tmpl,
 		})
-		http.Handle("/css/", http.FileServer(http.Dir(static_path)))
-		http.Handle("/js/", http.FileServer(http.Dir(static_path)))
+		http.Handle("/css/", http.FileServer(http.Dir(staticPath)))
+		http.Handle("/js/", http.FileServer(http.Dir(staticPath)))
 
 		go server.Serve(l)
-		err = http.ListenAndServe(http_bind, nil)
+		err = http.ListenAndServe(httpBind, nil)
 		if err != nil {
-			log.Fatal("Error binding to ", http_bind, ": ", err)
+			log.Fatal("Error binding to ", httpBind, ": ", err)
 		}
 	} else {
 		err = server.Serve(l)
