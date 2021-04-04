@@ -32,12 +32,12 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 
 	"github.com/caoimhechaos/x509keyserver"
 	"github.com/caoimhechaos/x509keyserver/keydb"
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 )
 
 // X509KeyServer implements the X.509 key server RPC interface.

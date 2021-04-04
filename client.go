@@ -32,6 +32,7 @@
 package x509keyserver
 
 import (
+	"context"
 	"crypto/x509"
 	"expvar"
 	"sync"
@@ -39,7 +40,6 @@ import (
 
 	"github.com/caoimhechaos/go-urlconnection"
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
